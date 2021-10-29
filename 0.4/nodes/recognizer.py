@@ -22,6 +22,7 @@ import gi
 gi.require_version('Gtk', '2.0')
 gi.require_version('Gst', '1.0')
 from gi.repository import Gtk, Gst
+Gst.init(None)
 
 from std_msgs.msg import String
 from std_srvs.srv import *
@@ -34,27 +35,11 @@ class recognizer(object):
         # Start node
         rospy.init_node("recognizer")
 
-        self._device_name_param = "~mic_name"  # Find the name of your microphone by typing pacmd list-sources in the terminal
         self._lm_param = "~lm"
         self._dic_param = "~dict"
 
-        # Configure mics with gstreamer launch config
-        if rospy.has_param(self._device_name_param):
-            self.device_name = rospy.get_param(self._device_name_param)
-            self.device_index = self.pulse_index_from_name(self.device_name)
-            self.launch_config = "pulsesrc device=" + str(self.device_index)
-            rospy.loginfo("Using: pulsesrc device=%s name=%s", self.device_index, self.device_name)
-        elif rospy.has_param('~source'):
-            # common sources: 'alsasrc'
-            self.launch_config = rospy.get_param('~source')
-        else:
-            self.launch_config = 'gconfaudiosrc'
-
-        rospy.loginfo("Launch config: %s", self.launch_config)
-
-        self.launch_config += " ! audioconvert ! audioresample " \
-                            + '! vader name=vad auto-threshold=true ' \
-                            + '! pocketsphinx name=asr ! fakesink'
+        self.launch_config = f"tcpserversrc port={rospy.get_param('~socket')} \
+            ! audioconvert ! audioresample ! pocketsphinx name=asr ! fakesink"
 
         # Configure ROS settings
         self.started = False
@@ -68,14 +53,32 @@ class recognizer(object):
         else:
             rospy.logwarn("lm and dic parameters need to be set to start recognizer.")
 
+    def element_message(self, bus, msg):
+        """Receive element messages from the bus."""
+        msgtype = msg.get_structure().get_name()
+        if msgtype != 'pocketsphinx':
+            return
+
+        if msg.get_structure().get_value('final'):
+            self.asr_result(msg.get_structure().get_value('hypothesis'),
+                msg.get_structure().get_value('confidence'))
+            # self.pipeline.set_state(Gst.State.PAUSED)
+        elif msg.get_structure().get_value('hypothesis'):
+            self.asr_partial_result(msg.get_structure().get_value('hypothesis'))
+
     def start_recognizer(self):
         rospy.loginfo("Starting recognizer... ")
 
         self.pipeline = Gst.parse_launch(self.launch_config)
         self.asr = self.pipeline.get_by_name('asr')
-        self.asr.connect('partial_result', self.asr_partial_result)
-        self.asr.connect('result', self.asr_result)
-        self.asr.set_property('configured', True)
+        # self.asr.connect('partial_result', self.asr_partial_result)
+        # self.asr.connect('result', self.asr_result)
+
+        bus = self.pipeline.get_bus()
+        bus.add_signal_watch()
+        bus.connect('message::element', self.element_message)
+
+        # self.asr.set_property('configured', True)
         self.asr.set_property('dsratio', 1)
 
         # Configure language model
@@ -97,7 +100,7 @@ class recognizer(object):
         self.bus = self.pipeline.get_bus()
         self.bus.add_signal_watch()
         self.bus_id = self.bus.connect('message::application', self.application_message)
-        self.pipeline.set_state(Gst.STATE_PLAYING)
+        self.pipeline.set_state(Gst.State.PLAYING)
         self.started = True
 
     def pulse_index_from_name(self, name):
@@ -120,7 +123,7 @@ class recognizer(object):
 
     def shutdown(self):
         """ Delete any remaining parameters so they don't affect next launch """
-        for param in [self._device_name_param, self._lm_param, self._dic_param]:
+        for param in [self._lm_param, self._dic_param]:
             if rospy.has_param(param):
                 rospy.delete_param(param)
 
