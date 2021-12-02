@@ -6,9 +6,9 @@ This model based on a corpus of 14 sentences and 13 words
 The (fixed) discount mass is 0.5
 
 \data\
-ngram 1=13
-ngram 2=25
-ngram 3=21
+ngram 1=15
+ngram 2=26
+ngram 3=22
 
 \1-grams:
 -0.8451 </s> -0.3010
@@ -24,6 +24,8 @@ ngram 3=21
 -1.6902 RIGHT -0.2341
 -1.6902 SPEED -0.2341
 -1.9912 STOP -0.2341
+-1.9912 COME -0.2341
+-1.9912 HERE -0.2341
 
 \2-grams:
 -1.4472 <s> BACK 0.0000
@@ -48,6 +50,7 @@ ngram 3=21
 -1.0000 MOVE FORWARD 0.0000
 -1.0000 MOVE LEFT 0.0000
 -1.0000 MOVE RIGHT 0.0000
+-1.0000 COME HERE 0.0000
 -0.3010 RIGHT </s> -0.3010
 -0.3010 SPEED </s> -0.3010
 -0.3010 STOP </s> -0.3010
@@ -65,6 +68,7 @@ ngram 3=21
 -1.0000 <s> MOVE FORWARD
 -1.0000 <s> MOVE LEFT
 -1.0000 <s> MOVE RIGHT
+-1.0000 <s> COME HERE
 -0.3010 <s> RIGHT </s>
 -0.3010 <s> STOP </s>
 -0.3010 FULL SPEED </s>
